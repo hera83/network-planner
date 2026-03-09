@@ -1,5 +1,16 @@
-let state = { vlans: [], servers: [], workloads: [] };
+let state = { servers: [], workloads: [] };
 const LAST_CHECK_STORAGE_KEY = 'networkPlanner:lastChecks';
+let sortState = { column: 'name', ascending: true };
+
+const VM_ID_RANGES = [
+  { start: 100, end: 199, label: 'Infrastructure', subnet: '10.64.10.0/24', gateway: '10.64.10.1' },
+  { start: 200, end: 299, label: 'Netværksservices', subnet: '10.64.20.0/24', gateway: '10.64.20.1' },
+  { start: 300, end: 399, label: 'Applikationer', subnet: '10.64.30.0/24', gateway: '10.64.30.1' },
+  { start: 400, end: 499, label: 'Databaser', subnet: '10.64.40.0/24', gateway: '10.64.40.1' },
+  { start: 500, end: 599, label: 'AI Services', subnet: '10.64.50.0/24', gateway: '10.64.50.1' },
+  { start: 700, end: 799, label: 'LXC / Utility', subnet: '10.64.70.0/24', gateway: '10.64.70.1' },
+  { start: 900, end: 999, label: 'Test / Lab', subnet: '10.64.90.0/24', gateway: '10.64.90.1' }
+];
 
 async function api(url, options = {}) {
   const response = await fetch(url, {
@@ -24,53 +35,70 @@ async function api(url, options = {}) {
 
 async function loadData() {
   state = await api('/api/overview');
-  renderStats();
-  renderVlans();
+  renderVmIdGrid();
   renderServers();
   renderWorkloads();
 }
 
-function renderStats() {
-  const el = document.getElementById('stats');
-  el.innerHTML = `
-    <div class="stat"><span>VLANs</span><strong>${state.vlans.length}</strong></div>
-    <div class="stat"><span>Servere</span><strong>${state.servers.length}</strong></div>
-    <div class="stat"><span>Workloads</span><strong>${state.workloads.length}</strong></div>
-    <div class="stat"><span>Næste ledige infra VM ID</span><strong>${nextVmId(100,199)}</strong></div>
-  `;
+function renderVmIdGrid() {
+  const grid = document.getElementById('vmidGrid');
+  grid.innerHTML = VM_ID_RANGES.map(range => {
+    const nextId = getNextVmId(range.start, range.end);
+    const nextIp = getNextIp(range.subnet);
+    return `<div>
+      <strong>${range.start}-${range.end}</strong>
+      <span>${range.label}</span><br/>
+      <small>ID: ${nextId}, IP: ${nextIp}</small>
+    </div>`;
+  }).join('');
 }
 
-function renderVlans() {
-  const tbody = document.getElementById('vlanTable');
-  tbody.innerHTML = state.vlans.map(v => `
-    <tr>
-      <td>${escapeHtml(v.name)}</td>
-      <td>${v.vlanId}</td>
-      <td>${escapeHtml(v.subnet)}</td>
-      <td>${escapeHtml(v.gateway)}</td>
-      <td>${escapeHtml(v.purpose)}</td>
-      <td>${escapeHtml(v.dhcpRange || '')}</td>
-      <td class="row-actions">
-        <button class="secondary" onclick='editVlan(${JSON.stringify(v).replace(/'/g, "&#39;")})'>Redigér</button>
-        <button class="danger" onclick='deleteVlan(${v.id})'>Slet</button>
-        ${renderLastCheckButton('vlan', v.id)}
-      </td>
-    </tr>`).join('');
+function getNextVmId(start, end) {
+  const used = new Set(state.workloads.filter(x => x.vmId != null).map(x => x.vmId));
+  for (let i = start; i <= end; i++) {
+    if (!used.has(i)) return i;
+  }
+  return 'Fuldt';
+}
+
+function getNextIp(subnet) {
+  // Parse subnet (e.g., "10.64.20.0/24") to get base IP
+  const baseIp = subnet.split('/')[0];
+  const parts = baseIp.split('.');
+  const baseOctet = parts[3];
+  const prefix = parts.slice(0, 3).join('.');
+  
+  // Find all used IPs in this subnet
+  const usedIps = new Set(state.workloads
+    .filter(w => w.ipAddress && w.ipAddress.startsWith(prefix))
+    .map(w => {
+      const lastOctet = w.ipAddress.split('.')[3];
+      return parseInt(lastOctet);
+    }));
+  
+  // Start from 30 (skip gateway and first few addresses)
+  for (let i = 30; i <= 254; i++) {
+    if (!usedIps.has(i)) return `${prefix}.${i}`;
+  }
+  return 'Fuldt';
 }
 
 function renderServers() {
   const tbody = document.getElementById('serverTable');
+  if (state.servers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 2rem; font-style: italic;">Ingen servere registreret endnu</td></tr>';
+    return;
+  }
   tbody.innerHTML = state.servers.map(s => `
     <tr>
       <td>${escapeHtml(s.name)}</td>
       <td>${escapeHtml(s.role)}</td>
       <td>${escapeHtml(s.location || '')}</td>
-      <td>${escapeHtml(s.managementIp)}</td>
       <td>${escapeHtml(s.serverNetworkIp || '')}</td>
       <td>${escapeHtml(s.iloIp || '')}</td>
       <td class="row-actions">
-        <button class="secondary" onclick='editServer(${JSON.stringify(s).replace(/'/g, "&#39;")})'>Redigér</button>
-        <button class="danger" onclick='deleteServer(${s.id})'>Slet</button>
+        <button class="icon-btn" onclick='editServer(${JSON.stringify(s).replace(/'/g, "&#39;")})' data-bs-toggle="tooltip" title="Redigér"><i class="bi bi-pencil-fill"></i></button>
+        <button class="icon-btn danger" onclick='deleteServer(${s.id})' data-bs-toggle="tooltip" title="Slet"><i class="bi bi-trash"></i></button>
         ${renderLastCheckButton('server', s.id)}
       </td>
     </tr>`).join('');
@@ -78,12 +106,21 @@ function renderServers() {
 
 function renderWorkloads() {
   const filter = document.getElementById('searchInput').value.toLowerCase().trim();
-  const filtered = state.workloads.filter(w => {
+  let filtered = state.workloads.filter(w => {
     const haystack = [w.name, w.workloadType, w.category, w.hostServer, w.ipAddress, w.operatingSystem].join(' ').toLowerCase();
     return haystack.includes(filter);
   });
 
+  // Sort the workloads
+  filtered = sortWorkloads(filtered);
+
   const tbody = document.getElementById('workloadTable');
+  if (filtered.length === 0) {
+    const message = state.workloads.length === 0 ? 'Ingen workloads registreret endnu' : 'Ingen workloads matcher søgningen';
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 2rem; font-style: italic;">${message}</td></tr>`;
+    updateSortIndicators();
+    return;
+  }
   tbody.innerHTML = filtered.map(w => `
     <tr>
       <td>${escapeHtml(w.name)}</td>
@@ -92,24 +129,24 @@ function renderWorkloads() {
       <td>${escapeHtml(w.hostServer || '')}</td>
       <td>${w.vmId ?? ''}</td>
       <td>${escapeHtml(w.ipAddress || '')}</td>
-      <td>${w.vlan ?? ''}</td>
       <td>${escapeHtml(w.operatingSystem || '')}</td>
       <td class="row-actions">
-        <button class="secondary" onclick='editWorkload(${JSON.stringify(w).replace(/'/g, "&#39;")})'>Redigér</button>
-        <button class="danger" onclick='deleteWorkload(${w.id})'>Slet</button>
+        <button class="icon-btn" onclick='editWorkload(${JSON.stringify(w).replace(/'/g, "&#39;")})' data-bs-toggle="tooltip" title="Redigér"><i class="bi bi-pencil-fill"></i></button>
+        <button class="icon-btn danger" onclick='deleteWorkload(${w.id})' data-bs-toggle="tooltip" title="Slet"><i class="bi bi-trash"></i></button>
+        <button class="icon-btn" onclick='copyWorkloadNotes(${JSON.stringify(w).replace(/'/g, "&#39;")})' data-bs-toggle="tooltip" title="Notes"><i class="bi bi-sticky"></i></button>
         ${renderLastCheckButton('workload', w.id)}
       </td>
     </tr>`).join('');
+  updateSortIndicators();
 }
 
 function renderLastCheckButton(entityType, id) {
   const lastCheckAt = getLastCheck(entityType, id);
   const stale = isOlderThanSixMonths(lastCheckAt);
-  const statusClass = stale ? 'last-check-stale' : 'last-check-fresh';
-  const label = stale ? 'Last check (mangler)' : 'Last check (ok)';
-  const hint = lastCheckAt ? `Sidst checket: ${formatDate(lastCheckAt)}` : 'Ikke checket endnu';
+  const statusClass = stale ? 'stale' : 'fresh';
+  const title = stale ? 'Last check (mangler) - Sidst: ' + (lastCheckAt ? formatDate(lastCheckAt) : 'Aldrig') : 'Last check (ok) - Sidst: ' + (lastCheckAt ? formatDate(lastCheckAt) : 'Aldrig');
 
-  return `<button class="last-check ${statusClass}" title="${escapeHtml(hint)}" onclick='markLastCheck("${entityType}", ${id})'>${label}</button>`;
+  return `<button class="icon-btn last-check-${statusClass}" data-bs-toggle="tooltip" title="${escapeHtml(title)}" onclick='markLastCheck("${entityType}", ${id})'><i class="bi bi-clock-history"></i></button>`;
 }
 
 function getLastCheck(entityType, id) {
@@ -151,25 +188,9 @@ function markLastCheck(entityType, id) {
   all[entityType][id] = new Date().toISOString();
   writeLastChecks(all);
 
-  renderVlans();
   renderServers();
   renderWorkloads();
   toast('Last check opdateret');
-}
-
-function editVlan(v) {
-  document.getElementById('vlanIdDb').value = v.id;
-  document.getElementById('vlanName').value = v.name;
-  document.getElementById('vlanId').value = v.vlanId;
-  document.getElementById('vlanSubnet').value = v.subnet;
-  document.getElementById('vlanGateway').value = v.gateway;
-  document.getElementById('vlanPurpose').value = v.purpose;
-  document.getElementById('vlanDhcpRange').value = v.dhcpRange || '';
-}
-
-function clearVlanForm() {
-  document.getElementById('vlanForm').reset();
-  document.getElementById('vlanIdDb').value = '';
 }
 
 function editServer(s) {
@@ -177,7 +198,6 @@ function editServer(s) {
   document.getElementById('serverName').value = s.name;
   document.getElementById('serverRole').value = s.role;
   document.getElementById('serverLocation').value = s.location || '';
-  document.getElementById('serverManagementIp').value = s.managementIp;
   document.getElementById('serverNetworkIp').value = s.serverNetworkIp || '';
   document.getElementById('serverIloIp').value = s.iloIp || '';
   document.getElementById('serverNotes').value = s.notes || '';
@@ -196,7 +216,6 @@ function editWorkload(w) {
   document.getElementById('workloadHostServer').value = w.hostServer || '';
   document.getElementById('workloadVmId').value = w.vmId || '';
   document.getElementById('workloadIpAddress').value = w.ipAddress || '';
-  document.getElementById('workloadVlan').value = w.vlan || '';
   document.getElementById('workloadOs').value = w.operatingSystem || '';
   document.getElementById('workloadDescription').value = w.description || '';
 }
@@ -206,13 +225,6 @@ function clearWorkloadForm() {
   document.getElementById('workloadIdDb').value = '';
 }
 
-async function deleteVlan(id) {
-  if (!confirm('Slet VLAN?')) return;
-  await api(`/api/vlans/${id}`, { method: 'DELETE' });
-  toast('VLAN slettet');
-  await loadData();
-}
-
 async function deleteServer(id) {
   if (!confirm('Slet server?')) return;
   await api(`/api/servers/${id}`, { method: 'DELETE' });
@@ -220,19 +232,35 @@ async function deleteServer(id) {
   await loadData();
 }
 
+function copyWorkloadNotes(workload) {
+  const notes = `
+Workload Notes for Proxmox
+==========================
+
+Navn: ${workload.name}
+Type: ${workload.workloadType}
+Kategori: ${workload.category}
+Host Server: ${workload.hostServer || 'N/A'}
+VM ID: ${workload.vmId || 'N/A'}
+IP Adresse: ${workload.ipAddress || 'N/A'}
+Operativsystem: ${workload.operatingSystem || 'N/A'}
+Beskrivelse: ${workload.description || 'N/A'}
+
+Oprettet i Network Planner
+`.trim();
+
+  navigator.clipboard.writeText(notes).then(() => {
+    toast('Notes kopieret til clipboard!');
+  }).catch(err => {
+    toast('Fejl ved kopiering: ' + err.message);
+  });
+}
+
 async function deleteWorkload(id) {
   if (!confirm('Slet workload?')) return;
   await api(`/api/workloads/${id}`, { method: 'DELETE' });
   toast('Workload slettet');
   await loadData();
-}
-
-function nextVmId(start, end) {
-  const used = new Set(state.workloads.filter(x => x.vmId != null).map(x => x.vmId));
-  for (let i = start; i <= end; i++) {
-    if (!used.has(i)) return i;
-  }
-  return 'Fuldt';
 }
 
 function escapeHtml(value) {
@@ -251,34 +279,64 @@ function toast(message) {
   setTimeout(() => el.classList.add('hidden'), 2500);
 }
 
-document.getElementById('refreshBtn').addEventListener('click', () => loadData());
-document.getElementById('searchInput').addEventListener('input', renderWorkloads);
+function sortWorkloads(workloads) {
+  return [...workloads].sort((a, b) => {
+    let aVal = a[sortState.column];
+    let bVal = b[sortState.column];
 
-document.getElementById('vlanForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const id = document.getElementById('vlanIdDb').value;
-  const payload = {
-    id: id ? Number(id) : 0,
-    name: document.getElementById('vlanName').value,
-    vlanId: Number(document.getElementById('vlanId').value),
-    subnet: document.getElementById('vlanSubnet').value,
-    gateway: document.getElementById('vlanGateway').value,
-    purpose: document.getElementById('vlanPurpose').value,
-    dhcpRange: document.getElementById('vlanDhcpRange').value || null
-  };
+    // Handle null/undefined values
+    if (aVal == null) aVal = '';
+    if (bVal == null) bVal = '';
 
-  try {
-    await api(id ? `/api/vlans/${id}` : '/api/vlans', {
-      method: id ? 'PUT' : 'POST',
-      body: JSON.stringify(payload)
+    // Handle numeric sorting for vmId
+    if (sortState.column === 'vmId') {
+      aVal = aVal === '' ? Infinity : Number(aVal);
+      bVal = bVal === '' ? Infinity : Number(bVal);
+    } else {
+      // String comparison (case insensitive)
+      aVal = String(aVal).toLowerCase();
+      bVal = String(bVal).toLowerCase();
+    }
+
+    if (aVal < bVal) return sortState.ascending ? -1 : 1;
+    if (aVal > bVal) return sortState.ascending ? 1 : -1;
+    return 0;
+  });
+}
+
+function updateSortIndicators() {
+  document.querySelectorAll('#workloadTable th.sortable').forEach(th => {
+    const indicator = th.querySelector('.sort-indicator');
+    if (th.dataset.sort === sortState.column) {
+      indicator.textContent = sortState.ascending ? ' ▲' : ' ▼';
+    } else {
+      indicator.textContent = '';
+    }
+  });
+}
+
+function setupSortListeners() {
+  document.querySelectorAll('#workloadTable th.sortable').forEach(th => {
+    th.style.cursor = 'pointer';
+    th.addEventListener('click', () => {
+      const column = th.dataset.sort;
+      if (sortState.column === column) {
+        sortState.ascending = !sortState.ascending;
+      } else {
+        sortState.column = column;
+        sortState.ascending = true;
+      }
+      renderWorkloads();
+      updateSortIndicators();
     });
-    clearVlanForm();
-    toast('VLAN gemt');
-    await loadData();
-  } catch (error) {
-    toast(error.message);
-  }
-});
+  });
+}
+
+document.getElementById('refreshBtn').addEventListener('click', () => loadData());
+document.getElementById('refreshBtn').innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+document.getElementById('refreshBtn').setAttribute('data-bs-toggle', 'tooltip');
+document.getElementById('refreshBtn').setAttribute('title', 'Opdater');
+document.getElementById('searchInput').addEventListener('input', renderWorkloads);
 
 document.getElementById('serverForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -288,7 +346,7 @@ document.getElementById('serverForm').addEventListener('submit', async (e) => {
     name: document.getElementById('serverName').value,
     role: document.getElementById('serverRole').value,
     location: document.getElementById('serverLocation').value || null,
-    managementIp: document.getElementById('serverManagementIp').value,
+    managementIp: document.getElementById('serverNetworkIp').value || 'N/A',
     serverNetworkIp: document.getElementById('serverNetworkIp').value || null,
     iloIp: document.getElementById('serverIloIp').value || null,
     notes: document.getElementById('serverNotes').value || null
@@ -311,7 +369,17 @@ document.getElementById('workloadForm').addEventListener('submit', async (e) => 
   e.preventDefault();
   const id = document.getElementById('workloadIdDb').value;
   const vmId = document.getElementById('workloadVmId').value;
-  const vlan = document.getElementById('workloadVlan').value;
+  const ipAddress = document.getElementById('workloadIpAddress').value || null;
+  
+  // Check for duplicate IP
+  if (ipAddress) {
+    const isDuplicate = state.workloads.some(w => w.id !== Number(id || 0) && w.ipAddress === ipAddress);
+    if (isDuplicate) {
+      toast('Fejl: IP-adressen bruges allerede af en anden workload!');
+      return;
+    }
+  }
+  
   const payload = {
     id: id ? Number(id) : 0,
     name: document.getElementById('workloadName').value,
@@ -319,8 +387,7 @@ document.getElementById('workloadForm').addEventListener('submit', async (e) => 
     category: document.getElementById('workloadCategory').value,
     hostServer: document.getElementById('workloadHostServer').value || null,
     vmId: vmId ? Number(vmId) : null,
-    ipAddress: document.getElementById('workloadIpAddress').value || null,
-    vlan: vlan ? Number(vlan) : null,
+    ipAddress: ipAddress,
     operatingSystem: document.getElementById('workloadOs').value || null,
     description: document.getElementById('workloadDescription').value || null
   };
@@ -339,3 +406,29 @@ document.getElementById('workloadForm').addEventListener('submit', async (e) => 
 });
 
 loadData().catch(error => toast(error.message));
+setupSortListeners();
+
+// Auto-fill VM ID and IP when category is selected
+document.getElementById('workloadCategory').addEventListener('change', function() {
+  const category = this.value;
+  if (!category) return;
+  
+  const range = VM_ID_RANGES.find(r => r.label === category);
+  if (!range) return;
+  
+  const nextVmId = getNextVmId(range.start, range.end);
+  const nextIp = getNextIp(range.subnet);
+  
+  if (nextVmId !== 'Fuldt') {
+    document.getElementById('workloadVmId').value = nextVmId;
+  }
+  if (nextIp !== 'Fuldt') {
+    document.getElementById('workloadIpAddress').value = nextIp;
+  }
+});
+
+// Initialize Bootstrap tooltips
+const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+  return new bootstrap.Tooltip(tooltipTriggerEl);
+});

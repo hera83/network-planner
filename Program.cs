@@ -40,56 +40,10 @@ app.UseStaticFiles();
 app.MapGet("/api/overview", async (AppDbContext db) =>
 {
     var response = new OverviewDto(
-        await db.Vlans.OrderBy(x => x.VlanId).ToListAsync(),
         await db.Servers.OrderBy(x => x.Name).ToListAsync(),
         await db.Workloads.OrderBy(x => x.VmId).ThenBy(x => x.Name).ToListAsync());
 
     return Results.Ok(response);
-});
-
-app.MapPost("/api/vlans", async (Vlan vlan, AppDbContext db) =>
-{
-    var exists = await db.Vlans.AnyAsync(x => x.VlanId == vlan.VlanId || x.Subnet == vlan.Subnet || x.Name == vlan.Name);
-    if (exists)
-    {
-        return Results.BadRequest(new { message = "VLAN ID, navn eller subnet findes allerede." });
-    }
-
-    db.Vlans.Add(vlan);
-    await db.SaveChangesAsync();
-    return Results.Created($"/api/vlans/{vlan.Id}", vlan);
-});
-
-app.MapPut("/api/vlans/{id:int}", async (int id, Vlan input, AppDbContext db) =>
-{
-    var vlan = await db.Vlans.FindAsync(id);
-    if (vlan is null) return Results.NotFound();
-
-    var duplicate = await db.Vlans.AnyAsync(x => x.Id != id && (x.VlanId == input.VlanId || x.Subnet == input.Subnet || x.Name == input.Name));
-    if (duplicate)
-    {
-        return Results.BadRequest(new { message = "VLAN ID, navn eller subnet findes allerede." });
-    }
-
-    vlan.Name = input.Name.Trim();
-    vlan.VlanId = input.VlanId;
-    vlan.Subnet = input.Subnet.Trim();
-    vlan.Gateway = input.Gateway.Trim();
-    vlan.Purpose = input.Purpose.Trim();
-    vlan.DhcpRange = input.DhcpRange?.Trim();
-
-    await db.SaveChangesAsync();
-    return Results.Ok(vlan);
-});
-
-app.MapDelete("/api/vlans/{id:int}", async (int id, AppDbContext db) =>
-{
-    var vlan = await db.Vlans.FindAsync(id);
-    if (vlan is null) return Results.NotFound();
-
-    db.Vlans.Remove(vlan);
-    await db.SaveChangesAsync();
-    return Results.NoContent();
 });
 
 app.MapPost("/api/servers", async (PhysicalServer server, AppDbContext db) =>
@@ -186,7 +140,6 @@ app.MapPut("/api/workloads/{id:int}", async (int id, Workload input, AppDbContex
     workload.HostServer = input.HostServer?.Trim();
     workload.VmId = input.VmId;
     workload.IpAddress = input.IpAddress?.Trim();
-    workload.Vlan = input.Vlan;
     workload.OperatingSystem = input.OperatingSystem?.Trim();
     workload.Description = input.Description?.Trim();
 
@@ -207,7 +160,6 @@ app.MapDelete("/api/workloads/{id:int}", async (int id, AppDbContext db) =>
 app.MapGet("/api/export", async (AppDbContext db) =>
 {
     var response = new OverviewDto(
-        await db.Vlans.OrderBy(x => x.VlanId).ToListAsync(),
         await db.Servers.OrderBy(x => x.Name).ToListAsync(),
         await db.Workloads.OrderBy(x => x.VmId).ThenBy(x => x.Name).ToListAsync());
 
@@ -216,7 +168,7 @@ app.MapGet("/api/export", async (AppDbContext db) =>
 
 app.Run();
 
-public record OverviewDto(List<Vlan> Vlans, List<PhysicalServer> Servers, List<Workload> Workloads);
+public record OverviewDto(List<PhysicalServer> Servers, List<Workload> Workloads);
 
 static class DbStartupBootstrapper
 {

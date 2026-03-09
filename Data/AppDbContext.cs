@@ -9,19 +9,11 @@ public class AppDbContext : DbContext
     {
     }
 
-    public DbSet<Vlan> Vlans => Set<Vlan>();
     public DbSet<PhysicalServer> Servers => Set<PhysicalServer>();
     public DbSet<Workload> Workloads => Set<Workload>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Vlan>(entity =>
-        {
-            entity.HasIndex(x => x.VlanId).IsUnique();
-            entity.HasIndex(x => x.Name).IsUnique();
-            entity.HasIndex(x => x.Subnet).IsUnique();
-        });
-
         modelBuilder.Entity<PhysicalServer>(entity =>
         {
             entity.HasIndex(x => x.Name).IsUnique();

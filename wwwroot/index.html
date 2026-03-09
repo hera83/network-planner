@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Homelab Network Planner</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -11,78 +13,14 @@
     <header>
       <div>
         <h1>Homelab Network Planner</h1>
-        <p>Overblik over VLANs, servere, IP-adresser og Proxmox VM IDs.</p>
+        <p>Overblik over servere, IP-adresser og Proxmox VM IDs.</p>
       </div>
-      <button id="refreshBtn">Opdater</button>
+      <button id="refreshBtn" data-bs-toggle="tooltip" title="Opdater"></button>
     </header>
 
-    <section class="grid stats" id="stats"></section>
-
     <section class="panel">
-      <h2>VLAN plan</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Navn</th>
-              <th>VLAN</th>
-              <th>Subnet</th>
-              <th>Gateway</th>
-              <th>Formål</th>
-              <th>DHCP</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="vlanTable"></tbody>
-        </table>
-      </div>
-      <form id="vlanForm" class="form-grid">
-        <input type="hidden" id="vlanIdDb" />
-        <input id="vlanName" placeholder="Navn" required />
-        <input id="vlanId" type="number" placeholder="VLAN ID" required />
-        <input id="vlanSubnet" placeholder="Subnet (10.64.10.0/24)" required />
-        <input id="vlanGateway" placeholder="Gateway" required />
-        <input id="vlanPurpose" placeholder="Formål" required />
-        <input id="vlanDhcpRange" placeholder="DHCP range" />
-        <div class="actions-row">
-          <button type="submit">Gem VLAN</button>
-          <button type="button" class="secondary" onclick="clearVlanForm()">Ny</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="panel">
-      <h2>Fysiske servere og netværksudstyr</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Navn</th>
-              <th>Rolle</th>
-              <th>Placering</th>
-              <th>Mgmt IP</th>
-              <th>Server IP</th>
-              <th>iLO/IPMI</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="serverTable"></tbody>
-        </table>
-      </div>
-      <form id="serverForm" class="form-grid">
-        <input type="hidden" id="serverIdDb" />
-        <input id="serverName" placeholder="Navn" required />
-        <input id="serverRole" placeholder="Rolle" required />
-        <input id="serverLocation" placeholder="Placering" />
-        <input id="serverManagementIp" placeholder="Management IP" required />
-        <input id="serverNetworkIp" placeholder="Server net IP" />
-        <input id="serverIloIp" placeholder="iLO/IPMI IP" />
-        <input id="serverNotes" placeholder="Noter" />
-        <div class="actions-row">
-          <button type="submit">Gem server</button>
-          <button type="button" class="secondary" onclick="clearServerForm()">Ny</button>
-        </div>
-      </form>
+      <h2>Anbefalet VM ID struktur</h2>
+      <div class="vmid-grid" id="vmidGrid"></div>
     </section>
 
     <section class="panel">
@@ -94,14 +32,13 @@
         <table>
           <thead>
             <tr>
-              <th>Navn</th>
-              <th>Type</th>
-              <th>Kategori</th>
-              <th>Host</th>
-              <th>VM ID</th>
-              <th>IP</th>
-              <th>VLAN</th>
-              <th>OS</th>
+              <th data-sort="name" class="sortable">Navn <span class="sort-indicator"></span></th>
+              <th data-sort="workloadType" class="sortable">Type <span class="sort-indicator"></span></th>
+              <th data-sort="category" class="sortable">Kategori <span class="sort-indicator"></span></th>
+              <th data-sort="hostServer" class="sortable">Host <span class="sort-indicator"></span></th>
+              <th data-sort="vmId" class="sortable">VM ID <span class="sort-indicator"></span></th>
+              <th data-sort="ipAddress" class="sortable">IP <span class="sort-indicator"></span></th>
+              <th data-sort="operatingSystem" class="sortable">OS <span class="sort-indicator"></span></th>
               <th></th>
             </tr>
           </thead>
@@ -117,36 +54,64 @@
           <option>Container</option>
           <option>Service</option>
         </select>
-        <input id="workloadCategory" placeholder="Kategori (Infrastructure, AI Services...)" required />
+        <select id="workloadCategory" aria-label="Kategori" required>
+          <option value="">Vælg kategori...</option>
+          <option>Infrastructure</option>
+          <option>Netværksservices</option>
+          <option>Applikationer</option>
+          <option>Databaser</option>
+          <option>AI Services</option>
+          <option>LXC / Utility</option>
+          <option>Test / Lab</option>
+        </select>
         <input id="workloadHostServer" placeholder="Host server" />
         <input id="workloadVmId" type="number" placeholder="VM ID" />
         <input id="workloadIpAddress" placeholder="IP-adresse" />
-        <input id="workloadVlan" type="number" placeholder="VLAN" />
         <input id="workloadOs" placeholder="OS" />
         <input id="workloadDescription" placeholder="Beskrivelse" />
         <div class="actions-row">
-          <button type="submit">Gem workload</button>
-          <button type="button" class="secondary" onclick="clearWorkloadForm()">Ny</button>
+          <button type="submit" class="form-submit-btn" data-bs-toggle="tooltip" title="Gem workload"><i class="bi bi-floppy-fill"></i></button>
+          <button type="button" class="form-clear-btn" onclick="clearWorkloadForm()" data-bs-toggle="tooltip" title="Nulstil"><i class="bi bi-arrow-counterclockwise"></i></button>
         </div>
       </form>
     </section>
 
     <section class="panel">
-      <h2>Anbefalet VM ID struktur</h2>
-      <div class="vmid-grid">
-        <div><strong>100-199</strong><span>Infrastructure</span></div>
-        <div><strong>200-299</strong><span>Netværksservices</span></div>
-        <div><strong>300-399</strong><span>Applikationer</span></div>
-        <div><strong>400-499</strong><span>Databaser</span></div>
-        <div><strong>500-599</strong><span>AI Services</span></div>
-        <div><strong>700-799</strong><span>LXC / Utility</span></div>
-        <div><strong>900-999</strong><span>Test / Lab</span></div>
+      <h2>Fysiske servere og netværksudstyr</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Navn</th>
+              <th>Rolle</th>
+              <th>Placering</th>
+              <th>Server IP</th>
+              <th>iLO/IPMI</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="serverTable"></tbody>
+        </table>
       </div>
+      <form id="serverForm" class="form-grid">
+        <input type="hidden" id="serverIdDb" />
+        <input id="serverName" placeholder="Navn" required />
+        <input id="serverRole" placeholder="Rolle" required />
+        <input id="serverLocation" placeholder="Placering" />
+        <input id="serverNetworkIp" placeholder="Server IP" />
+        <input id="serverIloIp" placeholder="iLO/IPMI IP" />
+        <input id="serverNotes" placeholder="Noter" />
+        <div class="actions-row">
+          <button type="submit" class="form-submit-btn" data-bs-toggle="tooltip" title="Gem server"><i class="bi bi-floppy-fill"></i></button>
+          <button type="button" class="form-clear-btn" onclick="clearServerForm()" data-bs-toggle="tooltip" title="Nulstil"><i class="bi bi-arrow-counterclockwise"></i></button>
+        </div>
+      </form>
     </section>
 
     <div id="toast" class="toast hidden"></div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

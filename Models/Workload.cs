@@ -26,8 +26,6 @@ public class Workload
     [StringLength(50)]
     public string? IpAddress { get; set; }
 
-    public int? Vlan { get; set; }
-
     [StringLength(100)]
     public string? OperatingSystem { get; set; }
 
