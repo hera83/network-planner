@@ -1,0 +1,22 @@
+# Build artifacts
+bin/
+obj/
+
+# Visual Studio / VS Code local state
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
+
+# Local database and runtime data
+Data/*.db
+Data/*.db-shm
+Data/*.db-wal
+
+# OS files
+.DS_Store
+Thumbs.db
