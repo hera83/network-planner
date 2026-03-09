@@ -1,0 +1,11 @@
+services:
+  homelab-network-planner:
+    build: .
+    container_name: homelab-network-planner
+    environment:
+      - ConnectionStrings__Default=Data Source=/app/data/network-planner.db
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

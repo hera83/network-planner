@@ -1,0 +1,26 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Network Planner",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"Network Planner.slnx"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Run Network Planner",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"NetworkPlanner.csproj"
+			],
+			"isBackground": true
+		}
+	]
+}

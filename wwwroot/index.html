@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Homelab Network Planner</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Homelab Network Planner</h1>
+        <p>Overblik over VLANs, servere, IP-adresser og Proxmox VM IDs.</p>
+      </div>
+      <button id="refreshBtn">Opdater</button>
+    </header>
+
+    <section class="grid stats" id="stats"></section>
+
+    <section class="panel">
+      <h2>VLAN plan</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Navn</th>
+              <th>VLAN</th>
+              <th>Subnet</th>
+              <th>Gateway</th>
+              <th>Formål</th>
+              <th>DHCP</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="vlanTable"></tbody>
+        </table>
+      </div>
+      <form id="vlanForm" class="form-grid">
+        <input type="hidden" id="vlanIdDb" />
+        <input id="vlanName" placeholder="Navn" required />
+        <input id="vlanId" type="number" placeholder="VLAN ID" required />
+        <input id="vlanSubnet" placeholder="Subnet (10.64.10.0/24)" required />
+        <input id="vlanGateway" placeholder="Gateway" required />
+        <input id="vlanPurpose" placeholder="Formål" required />
+        <input id="vlanDhcpRange" placeholder="DHCP range" />
+        <div class="actions-row">
+          <button type="submit">Gem VLAN</button>
+          <button type="button" class="secondary" onclick="clearVlanForm()">Ny</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Fysiske servere og netværksudstyr</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Navn</th>
+              <th>Rolle</th>
+              <th>Placering</th>
+              <th>Mgmt IP</th>
+              <th>Server IP</th>
+              <th>iLO/IPMI</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="serverTable"></tbody>
+        </table>
+      </div>
+      <form id="serverForm" class="form-grid">
+        <input type="hidden" id="serverIdDb" />
+        <input id="serverName" placeholder="Navn" required />
+        <input id="serverRole" placeholder="Rolle" required />
+        <input id="serverLocation" placeholder="Placering" />
+        <input id="serverManagementIp" placeholder="Management IP" required />
+        <input id="serverNetworkIp" placeholder="Server net IP" />
+        <input id="serverIloIp" placeholder="iLO/IPMI IP" />
+        <input id="serverNotes" placeholder="Noter" />
+        <div class="actions-row">
+          <button type="submit">Gem server</button>
+          <button type="button" class="secondary" onclick="clearServerForm()">Ny</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>VM'er, LXC og workloads</h2>
+      <div class="toolbar">
+        <input id="searchInput" placeholder="Søg på navn, host, kategori eller IP..." />
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Navn</th>
+              <th>Type</th>
+              <th>Kategori</th>
+              <th>Host</th>
+              <th>VM ID</th>
+              <th>IP</th>
+              <th>VLAN</th>
+              <th>OS</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="workloadTable"></tbody>
+        </table>
+      </div>
+      <form id="workloadForm" class="form-grid">
+        <input type="hidden" id="workloadIdDb" />
+        <input id="workloadName" placeholder="Navn" required />
+        <select id="workloadType">
+          <option>VM</option>
+          <option>LXC</option>
+          <option>Container</option>
+          <option>Service</option>
+        </select>
+        <input id="workloadCategory" placeholder="Kategori (Infrastructure, AI Services...)" required />
+        <input id="workloadHostServer" placeholder="Host server" />
+        <input id="workloadVmId" type="number" placeholder="VM ID" />
+        <input id="workloadIpAddress" placeholder="IP-adresse" />
+        <input id="workloadVlan" type="number" placeholder="VLAN" />
+        <input id="workloadOs" placeholder="OS" />
+        <input id="workloadDescription" placeholder="Beskrivelse" />
+        <div class="actions-row">
+          <button type="submit">Gem workload</button>
+          <button type="button" class="secondary" onclick="clearWorkloadForm()">Ny</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Anbefalet VM ID struktur</h2>
+      <div class="vmid-grid">
+        <div><strong>100-199</strong><span>Infrastructure</span></div>
+        <div><strong>200-299</strong><span>Netværksservices</span></div>
+        <div><strong>300-399</strong><span>Applikationer</span></div>
+        <div><strong>400-499</strong><span>Databaser</span></div>
+        <div><strong>500-599</strong><span>AI Services</span></div>
+        <div><strong>700-799</strong><span>LXC / Utility</span></div>
+        <div><strong>900-999</strong><span>Test / Lab</span></div>
+      </div>
+    </section>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
