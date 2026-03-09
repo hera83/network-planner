@@ -107,7 +107,7 @@ function renderServers() {
 function renderWorkloads() {
   const filter = document.getElementById('searchInput').value.toLowerCase().trim();
   let filtered = state.workloads.filter(w => {
-    const haystack = [w.name, w.workloadType, w.category, w.hostServer, w.ipAddress, w.operatingSystem].join(' ').toLowerCase();
+    const haystack = [w.name, w.category, w.hostServer, w.ipAddress, w.operatingSystem].join(' ').toLowerCase();
     return haystack.includes(filter);
   });
 
@@ -117,14 +117,13 @@ function renderWorkloads() {
   const tbody = document.getElementById('workloadTable');
   if (filtered.length === 0) {
     const message = state.workloads.length === 0 ? 'Ingen workloads registreret endnu' : 'Ingen workloads matcher søgningen';
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 2rem; font-style: italic;">${message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 2rem; font-style: italic;">${message}</td></tr>`;
     updateSortIndicators();
     return;
   }
   tbody.innerHTML = filtered.map(w => `
     <tr>
       <td>${escapeHtml(w.name)}</td>
-      <td>${escapeHtml(w.workloadType)}</td>
       <td>${escapeHtml(w.category)}</td>
       <td>${escapeHtml(w.hostServer || '')}</td>
       <td>${w.vmId ?? ''}</td>
@@ -171,9 +170,11 @@ function isOlderThanSixMonths(isoValue) {
   const checkedAt = new Date(isoValue);
   if (Number.isNaN(checkedAt.getTime())) return true;
 
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  return checkedAt < sixMonthsAgo;
+  const now = new Date();
+  // Properly calculate 6 months ago by subtracting 6 months
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+  
+  return checkedAt.getTime() < sixMonthsAgo.getTime();
 }
 
 function formatDate(isoValue) {
@@ -211,7 +212,6 @@ function clearServerForm() {
 function editWorkload(w) {
   document.getElementById('workloadIdDb').value = w.id;
   document.getElementById('workloadName').value = w.name;
-  document.getElementById('workloadType').value = w.workloadType;
   document.getElementById('workloadCategory').value = w.category;
   document.getElementById('workloadHostServer').value = w.hostServer || '';
   document.getElementById('workloadVmId').value = w.vmId || '';
@@ -238,7 +238,6 @@ Workload Notes for Proxmox
 ==========================
 
 Navn: ${workload.name}
-Type: ${workload.workloadType}
 Kategori: ${workload.category}
 Host Server: ${workload.hostServer || 'N/A'}
 VM ID: ${workload.vmId || 'N/A'}
@@ -383,7 +382,6 @@ document.getElementById('workloadForm').addEventListener('submit', async (e) => 
   const payload = {
     id: id ? Number(id) : 0,
     name: document.getElementById('workloadName').value,
-    workloadType: document.getElementById('workloadType').value,
     category: document.getElementById('workloadCategory').value,
     hostServer: document.getElementById('workloadHostServer').value || null,
     vmId: vmId ? Number(vmId) : null,

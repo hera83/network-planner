@@ -11,10 +11,6 @@ public class Workload
     public string Name { get; set; } = string.Empty;
 
     [Required]
-    [StringLength(50)]
-    public string WorkloadType { get; set; } = "VM";
-
-    [Required]
     [StringLength(100)]
     public string Category { get; set; } = string.Empty;
 

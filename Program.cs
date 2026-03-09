@@ -135,7 +135,6 @@ app.MapPut("/api/workloads/{id:int}", async (int id, Workload input, AppDbContex
     }
 
     workload.Name = input.Name.Trim();
-    workload.WorkloadType = input.WorkloadType.Trim();
     workload.Category = input.Category.Trim();
     workload.HostServer = input.HostServer?.Trim();
     workload.VmId = input.VmId;

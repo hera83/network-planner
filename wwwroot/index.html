@@ -33,7 +33,6 @@
           <thead>
             <tr>
               <th data-sort="name" class="sortable">Navn <span class="sort-indicator"></span></th>
-              <th data-sort="workloadType" class="sortable">Type <span class="sort-indicator"></span></th>
               <th data-sort="category" class="sortable">Kategori <span class="sort-indicator"></span></th>
               <th data-sort="hostServer" class="sortable">Host <span class="sort-indicator"></span></th>
               <th data-sort="vmId" class="sortable">VM ID <span class="sort-indicator"></span></th>
@@ -48,12 +47,6 @@
       <form id="workloadForm" class="form-grid">
         <input type="hidden" id="workloadIdDb" />
         <input id="workloadName" placeholder="Navn" required />
-        <select id="workloadType" aria-label="Workload type">
-          <option>VM</option>
-          <option>LXC</option>
-          <option>Container</option>
-          <option>Service</option>
-        </select>
         <select id="workloadCategory" aria-label="Kategori" required>
           <option value="">Vælg kategori...</option>
           <option>Infrastructure</option>
