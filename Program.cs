@@ -30,6 +30,8 @@ using (var scope = app.Services.CreateScope())
         await DbStartupBootstrapper.EnsureSqliteSchemaAsync(db);
     }
 
+    await DbStartupBootstrapper.RepairLegacySchemaAsync(db);
+
     var seeder = scope.ServiceProvider.GetRequiredService<SeedService>();
     await seeder.SeedAsync();
 }
@@ -197,6 +199,56 @@ static class DbStartupBootstrapper
             createScript = createScript.Replace("CREATE INDEX ", "CREATE INDEX IF NOT EXISTS ");
 
             await db.Database.ExecuteSqlRawAsync(createScript);
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
+    }
+
+    public static async Task RepairLegacySchemaAsync(AppDbContext db)
+    {
+        if (!db.Database.IsSqlite())
+        {
+            return;
+        }
+
+        await db.Database.OpenConnectionAsync();
+        try
+        {
+            await using var hasWorkloadTypeCommand = db.Database.GetDbConnection().CreateCommand();
+            hasWorkloadTypeCommand.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Workloads') WHERE name='WorkloadType';";
+            var hasWorkloadType = Convert.ToInt32(await hasWorkloadTypeCommand.ExecuteScalarAsync()) > 0;
+            if (!hasWorkloadType)
+            {
+                return;
+            }
+
+            // Rebuild legacy Workloads table to match the current model after WorkloadType removal.
+            await using var migrateCommand = db.Database.GetDbConnection().CreateCommand();
+            migrateCommand.CommandText = """
+                BEGIN TRANSACTION;
+                CREATE TABLE IF NOT EXISTS "__Workloads_New" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_Workloads" PRIMARY KEY AUTOINCREMENT,
+                    "Name" TEXT NOT NULL,
+                    "Category" TEXT NOT NULL,
+                    "HostServer" TEXT NULL,
+                    "VmId" INTEGER NULL,
+                    "IpAddress" TEXT NULL,
+                    "OperatingSystem" TEXT NULL,
+                    "Description" TEXT NULL
+                );
+                INSERT INTO "__Workloads_New" ("Id", "Name", "Category", "HostServer", "VmId", "IpAddress", "OperatingSystem", "Description")
+                SELECT "Id", "Name", "Category", "HostServer", "VmId", "IpAddress", "OperatingSystem", "Description"
+                FROM "Workloads";
+                DROP TABLE "Workloads";
+                ALTER TABLE "__Workloads_New" RENAME TO "Workloads";
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_Workloads_IpAddress" ON "Workloads" ("IpAddress");
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_Workloads_VmId" ON "Workloads" ("VmId");
+                COMMIT;
+                """;
+
+            await migrateCommand.ExecuteNonQueryAsync();
         }
         finally
         {
