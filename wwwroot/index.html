@@ -46,6 +46,7 @@
       </div>
       <form id="workloadForm" class="form-grid">
         <input type="hidden" id="workloadIdDb" />
+        <h3 id="workloadFormTitle" style="grid-column: 1 / -1; margin: 0 0 0.5rem 0; font-size: 1rem; color: var(--text);">Opret ny workload</h3>
         <input id="workloadName" placeholder="Navn" required />
         <select id="workloadCategory" aria-label="Kategori" required>
           <option value="">Vælg kategori...</option>
@@ -63,7 +64,7 @@
         <input id="workloadOs" placeholder="OS" />
         <input id="workloadDescription" placeholder="Beskrivelse" />
         <div class="actions-row">
-          <button type="submit" class="form-submit-btn" data-bs-toggle="tooltip" title="Gem workload"><i class="bi bi-floppy-fill"></i></button>
+          <button type="submit" class="form-submit-btn" data-bs-toggle="tooltip" title="Gem ny workload"><i class="bi bi-floppy-fill"></i> Gem ny</button>
           <button type="button" class="form-clear-btn" onclick="clearWorkloadForm()" data-bs-toggle="tooltip" title="Nulstil"><i class="bi bi-arrow-counterclockwise"></i></button>
         </div>
       </form>
@@ -88,6 +89,7 @@
       </div>
       <form id="serverForm" class="form-grid">
         <input type="hidden" id="serverIdDb" />
+        <h3 id="serverFormTitle" style="grid-column: 1 / -1; margin: 0 0 0.5rem 0; font-size: 1rem; color: var(--text);">Opret ny server</h3>
         <input id="serverName" placeholder="Navn" required />
         <input id="serverRole" placeholder="Rolle" required />
         <input id="serverLocation" placeholder="Placering" />
@@ -95,7 +97,7 @@
         <input id="serverIloIp" placeholder="iLO/IPMI IP" />
         <input id="serverNotes" placeholder="Noter" />
         <div class="actions-row">
-          <button type="submit" class="form-submit-btn" data-bs-toggle="tooltip" title="Gem server"><i class="bi bi-floppy-fill"></i></button>
+          <button type="submit" class="form-submit-btn" data-bs-toggle="tooltip" title="Gem ny server"><i class="bi bi-floppy-fill"></i> Gem ny</button>
           <button type="button" class="form-clear-btn" onclick="clearServerForm()" data-bs-toggle="tooltip" title="Nulstil"><i class="bi bi-arrow-counterclockwise"></i></button>
         </div>
       </form>

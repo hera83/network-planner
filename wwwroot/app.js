@@ -202,11 +202,29 @@ function editServer(s) {
   document.getElementById('serverNetworkIp').value = s.serverNetworkIp || '';
   document.getElementById('serverIloIp').value = s.iloIp || '';
   document.getElementById('serverNotes').value = s.notes || '';
+  updateServerFormMode();
 }
 
 function clearServerForm() {
   document.getElementById('serverForm').reset();
   document.getElementById('serverIdDb').value = '';
+  updateServerFormMode();
+}
+
+function updateServerFormMode() {
+  const id = document.getElementById('serverIdDb').value;
+  const submitBtn = document.querySelector('#serverForm button[type="submit"]');
+  const formTitle = document.querySelector('#serverFormTitle');
+  
+  if (id) {
+    submitBtn.innerHTML = '<i class="bi bi-floppy-fill"></i> Opdater';
+    submitBtn.setAttribute('title', 'Opdater server');
+    if (formTitle) formTitle.textContent = 'Redigér server';
+  } else {
+    submitBtn.innerHTML = '<i class="bi bi-floppy-fill"></i> Gem ny';
+    submitBtn.setAttribute('title', 'Gem ny server');
+    if (formTitle) formTitle.textContent = 'Opret ny server';
+  }
 }
 
 function editWorkload(w) {
@@ -218,11 +236,29 @@ function editWorkload(w) {
   document.getElementById('workloadIpAddress').value = w.ipAddress || '';
   document.getElementById('workloadOs').value = w.operatingSystem || '';
   document.getElementById('workloadDescription').value = w.description || '';
+  updateWorkloadFormMode();
 }
 
 function clearWorkloadForm() {
   document.getElementById('workloadForm').reset();
   document.getElementById('workloadIdDb').value = '';
+  updateWorkloadFormMode();
+}
+
+function updateWorkloadFormMode() {
+  const id = document.getElementById('workloadIdDb').value;
+  const submitBtn = document.querySelector('#workloadForm button[type="submit"]');
+  const formTitle = document.querySelector('#workloadFormTitle');
+  
+  if (id) {
+    submitBtn.innerHTML = '<i class="bi bi-floppy-fill"></i> Opdater';
+    submitBtn.setAttribute('title', 'Opdater workload');
+    if (formTitle) formTitle.textContent = 'Redigér workload';
+  } else {
+    submitBtn.innerHTML = '<i class="bi bi-floppy-fill"></i> Gem ny';
+    submitBtn.setAttribute('title', 'Gem ny workload');
+    if (formTitle) formTitle.textContent = 'Opret ny workload';
+  }
 }
 
 async function deleteServer(id) {
@@ -248,11 +284,54 @@ Beskrivelse: ${workload.description || 'N/A'}
 Oprettet i Network Planner
 `.trim();
 
-  navigator.clipboard.writeText(notes).then(() => {
-    toast('Notes kopieret til clipboard!');
-  }).catch(err => {
-    toast('Fejl ved kopiering: ' + err.message);
-  });
+  // Try modern clipboard API first (works on localhost and HTTPS)
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(notes).then(() => {
+      toast('Notes kopieret til clipboard!');
+    }).catch(err => {
+      // Fallback if clipboard API fails
+      fallbackCopyTextToClipboard(notes);
+    });
+  } else {
+    // Fallback for insecure contexts (HTTP)
+    fallbackCopyTextToClipboard(notes);
+  }
+}
+
+function fallbackCopyTextToClipboard(text) {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.top = '0';
+  textArea.style.left = '0';
+  textArea.style.width = '2em';
+  textArea.style.height = '2em';
+  textArea.style.padding = '0';
+  textArea.style.border = 'none';
+  textArea.style.outline = 'none';
+  textArea.style.boxShadow = 'none';
+  textArea.style.background = 'transparent';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    const successful = document.execCommand('copy');
+    if (successful) {
+      toast('Notes kopieret til clipboard!');
+    } else {
+      showNotesDialog(text);
+    }
+  } catch (err) {
+    showNotesDialog(text);
+  }
+
+  document.body.removeChild(textArea);
+}
+
+function showNotesDialog(text) {
+  const message = 'Kunne ikke kopiere automatisk. Kopier teksten nedenfor:\n\n' + text;
+  alert(message);
 }
 
 async function deleteWorkload(id) {
@@ -405,6 +484,8 @@ document.getElementById('workloadForm').addEventListener('submit', async (e) => 
 
 loadData().catch(error => toast(error.message));
 setupSortListeners();
+updateWorkloadFormMode(); // Initialize form mode on page load
+updateServerFormMode(); // Initialize server form mode on page load
 
 // Auto-fill VM ID and IP when category is selected
 document.getElementById('workloadCategory').addEventListener('change', function() {
