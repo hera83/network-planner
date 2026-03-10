@@ -285,17 +285,23 @@ Oprettet i Network Planner
 `.trim();
 
   // Try modern clipboard API first (works on localhost and HTTPS)
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(notes).then(() => {
-      toast('Notes kopieret til clipboard!');
-    }).catch(err => {
-      // Fallback if clipboard API fails
-      fallbackCopyTextToClipboard(notes);
-    });
-  } else {
-    // Fallback for insecure contexts (HTTP)
-    fallbackCopyTextToClipboard(notes);
+  try {
+    const clipboard = window.navigator && window.navigator.clipboard;
+    if (clipboard && typeof clipboard.writeText === 'function') {
+      clipboard.writeText(notes).then(() => {
+        toast('Notes kopieret til clipboard!');
+      }).catch(() => {
+        // Fallback if clipboard API fails
+        fallbackCopyTextToClipboard(notes);
+      });
+      return;
+    }
+  } catch {
+    // Ignore and use fallback below
   }
+
+  // Fallback for insecure contexts (HTTP) or missing clipboard API
+  fallbackCopyTextToClipboard(notes);
 }
 
 function fallbackCopyTextToClipboard(text) {
